@@ -1,29 +1,19 @@
 import 'server-only';
 
-import { Prisma } from '@prisma/client';
 import { format, subDays } from 'date-fns';
 
 import { prisma } from '@/lib/db/prisma';
 
-type DailyTotalRow = {
-    day: string | Date;
-    total: unknown;
-};
-
-type LowStockRow = {
-    id: string;
-    name: string;
-    barcode: string;
-    stockQuantity: number;
-    lowStockLimit: number;
-};
-
 export async function getDashboardData(role: 'ADMIN' | 'CASHIER', userId: string) {
-    const todayStart = new Date();
+    const now = new Date();
+
+    const todayStart = new Date(now);
     todayStart.setHours(0, 0, 0, 0);
-    const monthAgo = subDays(new Date(), 29);
+
+    const monthAgo = subDays(now, 29);
 
     const saleWhere = role === 'CASHIER' ? { cashierId: userId } : {};
+
     const todaySalesWhere = {
         ...saleWhere,
         createdAt: { gte: todayStart },
@@ -32,12 +22,12 @@ export async function getDashboardData(role: 'ADMIN' | 'CASHIER', userId: string
     const [
         todaySales,
         productsCount,
-        lowStockItems,
+        lowStockCandidates,
         recentTransactions,
         recentReturns,
         expenseSummary,
-        salesByDayRows,
-        returnsByDayRows,
+        sales,
+        returns,
     ] = await Promise.all([
         prisma.sale.aggregate({
             where: todaySalesWhere,
@@ -47,14 +37,18 @@ export async function getDashboardData(role: 'ADMIN' | 'CASHIER', userId: string
             _count: true,
         }),
         prisma.product.count({ where: { isActive: true } }),
-        prisma.$queryRaw<LowStockRow[]>`
-            SELECT "id", "name", "barcode", "stockQuantity", "lowStockLimit"
-            FROM "Product"
-            WHERE "isActive" = true
-              AND "stockQuantity" <= "lowStockLimit"
-            ORDER BY "stockQuantity" ASC, "name" ASC
-            LIMIT 5
-        `,
+        prisma.product.findMany({
+            where: { isActive: true },
+            orderBy: { stockQuantity: 'asc' },
+            select: {
+                id: true,
+                name: true,
+                barcode: true,
+                stockQuantity: true,
+                lowStockLimit: true,
+            },
+            take: 50,
+        }),
         prisma.sale.findMany({
             where: saleWhere,
             include: {
@@ -79,47 +73,32 @@ export async function getDashboardData(role: 'ADMIN' | 'CASHIER', userId: string
                 amount: true,
             },
         }),
-        prisma.$queryRaw<DailyTotalRow[]>(
-            role === 'CASHIER'
-                ? Prisma.sql`
-                    SELECT DATE("createdAt") AS "day", COALESCE(SUM("total"), 0) AS "total"
-                    FROM "Sale"
-                    WHERE "createdAt" >= ${monthAgo}
-                      AND "cashierId" = ${userId}
-                    GROUP BY DATE("createdAt")
-                    ORDER BY DATE("createdAt") ASC
-                  `
-                : Prisma.sql`
-                    SELECT DATE("createdAt") AS "day", COALESCE(SUM("total"), 0) AS "total"
-                    FROM "Sale"
-                    WHERE "createdAt" >= ${monthAgo}
-                    GROUP BY DATE("createdAt")
-                    ORDER BY DATE("createdAt") ASC
-                  `,
-        ),
-        prisma.$queryRaw<DailyTotalRow[]>(
-            role === 'CASHIER'
-                ? Prisma.sql`
-                    SELECT DATE("createdAt") AS "day", COALESCE(SUM("refundAmount"), 0) AS "total"
-                    FROM "Return"
-                    WHERE "createdAt" >= ${monthAgo}
-                      AND "cashierId" = ${userId}
-                    GROUP BY DATE("createdAt")
-                    ORDER BY DATE("createdAt") ASC
-                  `
-                : Prisma.sql`
-                    SELECT DATE("createdAt") AS "day", COALESCE(SUM("refundAmount"), 0) AS "total"
-                    FROM "Return"
-                    WHERE "createdAt" >= ${monthAgo}
-                    GROUP BY DATE("createdAt")
-                    ORDER BY DATE("createdAt") ASC
-                  `,
-        ),
+        prisma.sale.findMany({
+            where: {
+                ...saleWhere,
+                createdAt: { gte: monthAgo },
+            },
+            select: {
+                createdAt: true,
+                total: true,
+            },
+            orderBy: { createdAt: 'asc' },
+        }),
+        prisma.return.findMany({
+            where: {
+                ...(role === 'CASHIER' ? { cashierId: userId } : {}),
+                createdAt: { gte: monthAgo },
+            },
+            select: {
+                createdAt: true,
+                refundAmount: true,
+            },
+        }),
     ]);
 
     const dailySeries = Array.from({ length: 30 }, (_, index) => {
-        const date = subDays(new Date(), 29 - index);
-        const label = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        const date = subDays(now, 29 - index);
+        const label = format(date, 'MMM d');
         const key = format(date, 'yyyy-MM-dd');
 
         return {
@@ -133,21 +112,23 @@ export async function getDashboardData(role: 'ADMIN' | 'CASHIER', userId: string
     const salesByDay = new Map<string, number>();
     const returnsByDay = new Map<string, number>();
 
-    for (const row of salesByDayRows) {
-        const key = format(new Date(row.day), 'yyyy-MM-dd');
-        salesByDay.set(key, Number(row.total ?? 0));
+    for (const sale of sales) {
+        const key = format(sale.createdAt, 'yyyy-MM-dd');
+        salesByDay.set(key, (salesByDay.get(key) ?? 0) + Number(sale.total));
     }
 
-    for (const row of returnsByDayRows) {
-        const key = format(new Date(row.day), 'yyyy-MM-dd');
-        returnsByDay.set(key, Number(row.total ?? 0));
+    for (const row of returns) {
+        const key = format(row.createdAt, 'yyyy-MM-dd');
+        returnsByDay.set(key, (returnsByDay.get(key) ?? 0) + Number(row.refundAmount));
     }
 
     return {
         todaySales: Number(todaySales._sum.total ?? 0),
         todaySalesCount: todaySales._count,
         productsCount,
-        lowStockItems,
+        lowStockItems: lowStockCandidates
+            .filter((product) => product.stockQuantity <= product.lowStockLimit)
+            .slice(0, 5),
         recentTransactions,
         recentReturns,
         todayExpenses: Number(expenseSummary._sum.amount ?? 0),

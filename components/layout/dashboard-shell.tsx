@@ -16,13 +16,12 @@ export function DashboardShell({
     children: React.ReactNode;
     session: SessionUser;
 }) {
-    const [collapsed, setCollapsed] = useState(() => {
-        if (typeof window === 'undefined') {
-            return true;
-        }
+    const [collapsed, setCollapsed] = useState(true);
 
-        return window.localStorage.getItem(SIDEBAR_STORAGE_KEY) === 'true';
-    });
+    useEffect(() => {
+        const storedValue = window.localStorage.getItem(SIDEBAR_STORAGE_KEY);
+        setCollapsed(storedValue === 'true');
+    }, []);
 
     useEffect(() => {
         window.localStorage.setItem(SIDEBAR_STORAGE_KEY, String(collapsed));
@@ -47,7 +46,7 @@ export function DashboardShell({
                 </div>
 
                 <div className="min-w-0 flex-1 space-y-2">
-                    <Topbar session={session} />
+                    <Topbar session={session} today={new Date().toISOString()} />
                     <main className="space-y-4">{children}</main>
                 </div>
             </div>

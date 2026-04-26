@@ -1,6 +1,6 @@
 import "server-only";
 
-import { PrismaPg } from "@prisma/adapter-pg";
+import { PrismaNeon } from "@prisma/adapter-neon";
 import { PrismaClient } from "@prisma/client";
 
 const databaseUrl =
@@ -13,7 +13,7 @@ const globalForPrisma = globalThis as typeof globalThis & {
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
-    adapter: new PrismaPg({ connectionString: databaseUrl }),
+    adapter: new PrismaNeon({ connectionString: databaseUrl }),
     log: process.env.NODE_ENV === "development" ? ["error", "warn"] : ["error"],
   });
 

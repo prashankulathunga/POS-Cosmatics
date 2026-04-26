@@ -68,9 +68,9 @@ export function AppSidebar({
                             ) : (
                                 <ChevronLeft className="h-4 w-4 text-white" />
                             )}
-                            <span className="sr-only">
+                            {/* <span className="sr-only">
                                 {collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                            </span>
+                            </span> */}
                         </Button>
                     ) : null}
                 </div>

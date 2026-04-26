@@ -1,25 +1,15 @@
 import "server-only";
 
-import { Prisma } from "@prisma/client";
 import { endOfDay, startOfDay } from "date-fns";
 
 import { prisma } from "@/lib/db/prisma";
 import { reportFilterSchema, type ReportFilterInput } from "@/lib/validations/report";
 
-type ReportDataOptions = {
-  preview?: boolean;
-};
-
-type ProfitRow = {
-  profitTotal: unknown;
-};
-
-export async function getReportData(input: ReportFilterInput, options: ReportDataOptions = {}) {
+export async function getReportData(input: ReportFilterInput) {
   const filters = reportFilterSchema.parse(input);
   const start = startOfDay(new Date(filters.startDate));
   const end = endOfDay(new Date(filters.endDate));
   const cashierFilter = filters.cashierId ? { cashierId: filters.cashierId } : {};
-  const previewTake = options.preview ? 12 : undefined;
 
   const salesWhere = {
     createdAt: {
@@ -37,19 +27,7 @@ export async function getReportData(input: ReportFilterInput, options: ReportDat
     ...(filters.cashierId ? { cashierId: filters.cashierId } : {}),
   };
 
-  const [
-    sales,
-    saleItems,
-    expenses,
-    returns,
-    cashierSales,
-    stock,
-    salesSummary,
-    expenseSummary,
-    returnSummary,
-    profitRows,
-    bestSellingRows,
-  ] =
+  const [sales, saleItems, expenses, returns, cashierSales, stock, salesSummary, expenseSummary, returnSummary] =
     await Promise.all([
     prisma.sale.findMany({
       where: salesWhere,
@@ -67,7 +45,6 @@ export async function getReportData(input: ReportFilterInput, options: ReportDat
         },
       },
       orderBy: { createdAt: "desc" },
-      take: previewTake,
     }),
     prisma.saleItem.findMany({
       where: {
@@ -91,8 +68,6 @@ export async function getReportData(input: ReportFilterInput, options: ReportDat
           },
         },
       },
-      orderBy: { createdAt: "desc" },
-      take: options.preview ? 50 : undefined,
     }),
     prisma.expense.findMany({
       where: {
@@ -113,7 +88,6 @@ export async function getReportData(input: ReportFilterInput, options: ReportDat
         },
       },
       orderBy: { expenseDate: "desc" },
-      take: previewTake,
     }),
     prisma.return.findMany({
       where: returnWhere,
@@ -134,7 +108,6 @@ export async function getReportData(input: ReportFilterInput, options: ReportDat
         },
       },
       orderBy: { createdAt: "desc" },
-      take: previewTake,
     }),
     prisma.sale.groupBy({
       by: ["cashierId"],
@@ -159,7 +132,6 @@ export async function getReportData(input: ReportFilterInput, options: ReportDat
         },
       },
       orderBy: { stockQuantity: "asc" },
-      take: options.preview ? 50 : undefined,
     }),
     prisma.sale.aggregate({
       where: salesWhere,
@@ -184,40 +156,6 @@ export async function getReportData(input: ReportFilterInput, options: ReportDat
         refundAmount: true,
       },
     }),
-    prisma.$queryRaw<ProfitRow[]>(
-      filters.cashierId
-        ? Prisma.sql`
-            SELECT COALESCE(SUM(si."lineTotal" - (si."buyingPriceSnapshot" * si."quantity")), 0) AS "profitTotal"
-            FROM "SaleItem" si
-            INNER JOIN "Sale" s ON s."id" = si."saleId"
-            WHERE s."createdAt" >= ${start}
-              AND s."createdAt" <= ${end}
-              AND s."cashierId" = ${filters.cashierId}
-          `
-        : Prisma.sql`
-            SELECT COALESCE(SUM(si."lineTotal" - (si."buyingPriceSnapshot" * si."quantity")), 0) AS "profitTotal"
-            FROM "SaleItem" si
-            INNER JOIN "Sale" s ON s."id" = si."saleId"
-            WHERE s."createdAt" >= ${start}
-              AND s."createdAt" <= ${end}
-          `,
-    ),
-    prisma.saleItem.groupBy({
-      by: ["productNameSnapshot", "productBarcodeSnapshot"],
-      where: {
-        sale: salesWhere,
-      },
-      _sum: {
-        quantity: true,
-        lineTotal: true,
-      },
-      orderBy: {
-        _sum: {
-          quantity: "desc",
-        },
-      },
-      take: options.preview ? 12 : undefined,
-    }),
   ]);
 
   const summary = {
@@ -226,14 +164,34 @@ export async function getReportData(input: ReportFilterInput, options: ReportDat
     returnTotal: Number(returnSummary._sum.refundAmount ?? 0),
   };
 
-  const profitTotal = Number(profitRows[0]?.profitTotal ?? 0);
+  const profitTotal = saleItems.reduce((sum, item) => {
+    const cost = Number(item.buyingPriceSnapshot) * item.quantity;
+    const revenue = Number(item.lineTotal);
+    return sum + (revenue - cost);
+  }, 0);
 
-  const bestSellingProducts = bestSellingRows.map((item) => ({
-    productName: item.productNameSnapshot,
-    barcode: item.productBarcodeSnapshot,
-    quantity: item._sum.quantity ?? 0,
-    salesTotal: Number(item._sum.lineTotal ?? 0),
-  }));
+  const bestSellingMap = new Map<
+    string,
+    {
+      productName: string;
+      barcode: string;
+      quantity: number;
+      salesTotal: number;
+    }
+  >();
+
+  for (const item of saleItems) {
+    const current = bestSellingMap.get(item.productNameSnapshot) ?? {
+      productName: item.productNameSnapshot,
+      barcode: item.productBarcodeSnapshot,
+      quantity: 0,
+      salesTotal: 0,
+    };
+
+    current.quantity += item.quantity;
+    current.salesTotal += Number(item.lineTotal);
+    bestSellingMap.set(item.productNameSnapshot, current);
+  }
 
   const cashierIds = cashierSales.map((row) => row.cashierId);
   const cashiers = cashierIds.length
@@ -262,7 +220,7 @@ export async function getReportData(input: ReportFilterInput, options: ReportDat
     saleItems,
     expenses,
     returns,
-    bestSellingProducts,
+    bestSellingProducts: Array.from(bestSellingMap.values()).sort((a, b) => b.quantity - a.quantity),
     stock,
     cashierSummary,
   };

@@ -21,19 +21,12 @@ export function SalesChart({
     currencyCode: string;
 }) {
     return (
-        <Card className="min-w-0">
+        <Card>
             <CardHeader>
                 <CardTitle>Sales Trend</CardTitle>
             </CardHeader>
-            <CardContent className="h-[320px] min-h-[320px] min-w-0">
-                <ResponsiveContainer
-                    width="100%"
-                    height={320}
-                    minWidth={0}
-                    minHeight={320}
-                    initialDimension={{ width: 640, height: 320 }}
-                    debounce={50}
-                >
+            <CardContent className="h-[320px]">
+                <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={data}>
                         <defs>
                             <linearGradient id="salesGradient" x1="0" x2="0" y1="0" y2="1">

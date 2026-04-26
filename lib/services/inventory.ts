@@ -23,7 +23,7 @@ export async function listInventory(options: ListInventoryOptions = {}) {
       }
     : {};
 
-  const [products, totalCount, lowStockRows, movements] = await Promise.all([
+  const [products, totalCount, allActiveProducts, movements] = await Promise.all([
     prisma.product.findMany({
       where,
       include: { category: true },
@@ -32,9 +32,13 @@ export async function listInventory(options: ListInventoryOptions = {}) {
       take: PAGE_SIZE,
     }),
     prisma.product.count({ where }),
-    prisma.$queryRaw<Array<{ count: bigint }>>(
-      Prisma.sql`SELECT COUNT(*)::bigint AS "count" FROM "Product" WHERE "isActive" = true AND "stockQuantity" <= "lowStockLimit"`,
-    ),
+    prisma.product.findMany({
+      where: { isActive: true },
+      select: {
+        stockQuantity: true,
+        lowStockLimit: true,
+      },
+    }),
     prisma.stockMovement.findMany({
       include: {
         product: true,
@@ -55,7 +59,7 @@ export async function listInventory(options: ListInventoryOptions = {}) {
       category: product.category ? { name: product.category.name } : null,
     })),
     movements,
-    lowStockCount: Number(lowStockRows[0]?.count ?? 0),
+    lowStockCount: allActiveProducts.filter((product) => product.stockQuantity <= product.lowStockLimit).length,
     page,
     totalCount,
     totalPages: Math.max(Math.ceil(totalCount / PAGE_SIZE), 1),

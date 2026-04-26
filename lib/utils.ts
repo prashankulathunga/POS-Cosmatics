@@ -1,5 +1,6 @@
 import { type ClassValue, clsx } from 'clsx';
-import { format, formatDistanceToNowStrict, startOfDay } from 'date-fns';
+import { formatDistanceToNowStrict, startOfDay } from 'date-fns';
+import { format, isValid } from 'date-fns';
 
 export function cn(...inputs: ClassValue[]) {
     return clsx(inputs);
@@ -16,8 +17,21 @@ export function formatCurrency(value: number | string, currency = 'LKR', locale 
     }).format(Number.isFinite(amount) ? amount : 0);
 }
 
-export function formatDateTime(value: Date | string, pattern = 'dd MMM yyyy, hh:mm a') {
-    return format(new Date(value), pattern);
+// export function formatDateTime(value: Date | string, pattern = 'dd MMM yyyy, hh:mm a') {
+//     return format(new Date(value), pattern);
+// }
+
+export function formatDateTime(value?: Date | string | null, pattern = 'dd MMM yyyy, hh:mm a') {
+    if (!value) return '-';
+
+    const date = new Date(value);
+
+    if (!isValid(date)) {
+        console.warn('Invalid date passed to formatDateTime:', value);
+        return '-';
+    }
+
+    return format(date, pattern);
 }
 
 export function formatShortDate(value: Date | string) {

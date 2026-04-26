@@ -166,6 +166,16 @@ export function PosTerminal({
         );
     }
 
+    function updateDiscount(productId: string, value: string) {
+        setCart((current) =>
+            current.map((entry) =>
+                entry.product.id === productId
+                    ? { ...entry, discountAmount: Number(value || '0') }
+                    : entry,
+            ),
+        );
+    }
+
     async function loadReceipt(saleId: string) {
 
         // TODO: resolve this fetch query
@@ -181,6 +191,11 @@ export function PosTerminal({
         return (await response.json()) as ReceiptPayload;
     }
 
+
+    function delay(ms: number) {
+        return new Promise((resolve) => setTimeout(resolve, ms));
+    }
+
     async function handleReceiptPrint(saleId: string) {
         if (isPrintRef.current) return;
 
@@ -194,6 +209,7 @@ export function PosTerminal({
             }
 
             await printReceiptEscPos(receiptData);
+            // await delay(1000);
 
         } catch (error) {
             console.error('Receipt print failed', error);

@@ -12,9 +12,6 @@ const DEFAULT_RECEIPT_SHOP_NAME = 'BLISSORA';
 const LEGACY_RECEIPT_SHOP_NAME = 'POS Beauty Store';
 const DEFAULT_LOGO_PUBLIC_PATH = process.env.NEXT_PUBLIC_RECEIPT_LOGO_PATH ?? '/Bls-rm.png';
 const DEFAULT_QZ_ENCODING = process.env.NEXT_PUBLIC_RECEIPT_ENCODING ?? 'Cp437';
-const QZ_TRAY_SCRIPT_SRC =
-    process.env.NEXT_PUBLIC_QZ_TRAY_SCRIPT_SRC ??
-    'https://cdn.jsdelivr.net/npm/qz-tray@2.2.6/qz-tray.js';
 const QZ_SCRIPT_WAIT_TIMEOUT_MS = 8000;
 
 export const DEFAULT_RECEIPT_PRINTER_NAME =
@@ -163,7 +160,6 @@ let qzSecurityConfigured = false;
 let qzConnectionPromise: Promise<void> | null = null;
 let logoDataUrlPromise: Promise<string | null> | null = null;
 let printQueue: Promise<void> = Promise.resolve();
-let qzScriptLoadPromise: Promise<QzTrayApi> | null = null;
 
 function readBooleanEnv(value: string | undefined, defaultValue: boolean) {
     if (value == null || value.trim() === '') return defaultValue;
@@ -251,64 +247,6 @@ async function waitForQzTrayScript(timeoutMs = QZ_SCRIPT_WAIT_TIMEOUT_MS) {
     return getWindowQz();
 }
 
-function loadQzTrayScript() {
-    const existingQz = getWindowQz();
-
-    if (existingQz) {
-        return Promise.resolve(existingQz);
-    }
-
-    if (qzScriptLoadPromise) {
-        return qzScriptLoadPromise;
-    }
-
-    qzScriptLoadPromise = new Promise<QzTrayApi>((resolve, reject) => {
-        const existingScript = document.getElementById('qz-tray') as HTMLScriptElement | null;
-        const script = existingScript ?? document.createElement('script');
-
-        const finishLoad = async () => {
-            const qz = getWindowQz() ?? (await waitForQzTrayScript(1000));
-
-            if (!qz) {
-                reject(
-                    new ReceiptPrinterError(
-                        `QZ Tray browser script loaded from ${QZ_TRAY_SCRIPT_SRC}, but window.qz was not created.`,
-                    ),
-                );
-                return;
-            }
-
-            resolve(qz);
-        };
-
-        script.addEventListener('load', () => {
-            void finishLoad();
-        });
-        script.addEventListener('error', (event) => {
-            qzScriptLoadPromise = null;
-            reject(
-                new ReceiptPrinterError(
-                    `Failed to load QZ Tray browser script from ${QZ_TRAY_SCRIPT_SRC}. Check internet access or host qz-tray.js locally.`,
-                    event,
-                ),
-            );
-        });
-
-        if (!existingScript) {
-            script.id = 'qz-tray';
-            script.src = QZ_TRAY_SCRIPT_SRC;
-            script.async = true;
-            script.crossOrigin = 'anonymous';
-            document.body.appendChild(script);
-            return;
-        }
-
-        void finishLoad();
-    });
-
-    return qzScriptLoadPromise;
-}
-
 async function getQzTray() {
     if (typeof window === 'undefined') {
         logError('QZ script loaded: false', { reason: 'window is unavailable' });
@@ -319,12 +257,11 @@ async function getQzTray() {
 
     const scriptElement =
         typeof document !== 'undefined' ? document.getElementById('qz-tray') : null;
-    const qz = getWindowQz() ?? (await loadQzTrayScript());
+    const qz = getWindowQz() ?? (await waitForQzTrayScript());
 
     logInfo('QZ script loaded', {
         loaded: Boolean(qz),
         scriptTagPresent: Boolean(scriptElement),
-        src: QZ_TRAY_SCRIPT_SRC,
     });
 
     if (!qz) {

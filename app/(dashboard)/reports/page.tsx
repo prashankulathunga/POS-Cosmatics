@@ -45,7 +45,7 @@ export default async function ReportsPage({
             startDate,
             endDate,
             cashierId: params.cashierId,
-        }, { preview: true }),
+        }),
         prisma.user.findMany({
             where: { role: 'CASHIER', isActive: true },
             orderBy: { fullName: 'asc' },
