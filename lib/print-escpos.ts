@@ -7,7 +7,7 @@ const GS = '\x1D';
 const LF = '\x0A';
 
 const RECEIPT_WIDTH = 48;
-const SHOP_NAME_PRINT_WIDTH = 72;
+const SHOP_NAME_PRINT_WIDTH = 110;
 const DEFAULT_RECEIPT_SHOP_NAME = 'BLISSORA';
 const LEGACY_RECEIPT_SHOP_NAME = 'POS Beauty Store';
 const DEFAULT_LOGO_PUBLIC_PATH = process.env.NEXT_PUBLIC_RECEIPT_LOGO_PATH ?? '/Bls-rm.png';
@@ -610,8 +610,12 @@ function formatPaymentMethod(value: string) {
     return cleanInlineText(value, 'UNKNOWN').replace(/_/g, ' ').toUpperCase();
 }
 
+// function initPrinter() {
+//     return ESC + '@' + ESC + 't' + '\x00';
+// }
+
 function initPrinter() {
-    return ESC + '@' + ESC + 't' + '\x00';
+    return `${ESC}@${ESC}t\x00`;
 }
 
 function setAlignment(mode: 'left' | 'center' | 'right') {
@@ -648,8 +652,12 @@ function feed(lines = 1) {
     return ESC + 'd' + String.fromCharCode(lineCount);
 }
 
+// function cutPaper() {
+//     return GS + 'V' + '\x42' + '\x00';
+// }
+
 function cutPaper() {
-    return GS + 'V' + '\x42' + '\x00';
+    return `${GS}V\x00`;
 }
 
 function divider(char = '-', width = RECEIPT_WIDTH) {
@@ -869,18 +877,28 @@ function buildReceiptText(data: ReceiptPayload, options: NormalizedReceiptPrinte
     const balance = toMoney(data.sale.balance);
     const changeLabel = balance < 0 ? 'Balance' : 'Change';
 
+    // const lines: string[] = [
+    //     initPrinter(),
+    //     setAlignment('center'),
+    //     setTextSize('double'),
+    //     setBold(true),
+    //     feed(2),
+    //     centerLine(shopName, SHOP_NAME_PRINT_WIDTH) + LF,
+    //     setBold(false),
+    //     setTextSize('normal'),
+    // ];
+
     const lines: string[] = [
         initPrinter(),
         setAlignment('center'),
-        setTextSize('double-height'),
+        setTextSize('double'),
         setBold(true),
-        feed(2),
         centerLine(shopName, SHOP_NAME_PRINT_WIDTH) + LF,
         setBold(false),
         setTextSize('normal'),
+        feed(1),
     ];
 
-    console.log('Receipt shopName:', shopName);
 
     const address = cleanText(settings.address);
 
@@ -908,7 +926,7 @@ function buildReceiptText(data: ReceiptPayload, options: NormalizedReceiptPrinte
     //     lines.push(`INVOICE # ${invoiceNumber}` + LF);
     // }
 
-    lines.push(setBold(false), majorDivider(), setAlignment('left'));
+    lines.push(feed(1), setBold(false), setAlignment('left'));
     lines.push(
         makeColumnLine('Date/Time', formatDateTime(data.sale.createdAt, 'dd/MM/yyyy hh:mm a')) + LF,
     );
