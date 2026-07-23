@@ -1,4 +1,4 @@
-# POS Beauty
+# POS Cosmatics
 
 Production-oriented retail POS for a small startup shop, built with Next.js App Router, TypeScript, Tailwind CSS, Prisma, and PostgreSQL.
 
