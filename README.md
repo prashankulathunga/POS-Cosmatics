@@ -624,5 +624,5 @@ npx prisma migrate deploy
 ---
 
 <div>
-  Built for fast, reliable cosmetics retail operations.
+  Designed for seamless, efficient and modern cosmetics retail management.
 </div>
