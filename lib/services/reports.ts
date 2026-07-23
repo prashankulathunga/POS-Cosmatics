@@ -1,11 +1,11 @@
 import "server-only";
 
 import { endOfDay, startOfDay } from "date-fns";
-
+import type { ReportData } from '@/lib/types';
 import { prisma } from "@/lib/db/prisma";
 import { reportFilterSchema, type ReportFilterInput } from "@/lib/validations/report";
 
-export async function getReportData(input: ReportFilterInput) {
+export async function getReportData(input: ReportFilterInput): Promise<ReportData>  {
   const filters = reportFilterSchema.parse(input);
   const start = startOfDay(new Date(filters.startDate));
   const end = endOfDay(new Date(filters.endDate));

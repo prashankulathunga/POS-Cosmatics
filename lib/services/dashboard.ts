@@ -1,10 +1,10 @@
 import 'server-only';
 
 import { format, subDays } from 'date-fns';
-
+import type { DashboardData } from '@/lib/types';
 import { prisma } from '@/lib/db/prisma';
 
-export async function getDashboardData(role: 'ADMIN' | 'CASHIER', userId: string) {
+export async function getDashboardData(role: 'ADMIN' | 'CASHIER', userId: string) : Promise<DashboardData>{
     const now = new Date();
 
     const todayStart = new Date(now);
