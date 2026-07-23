@@ -1,4 +1,5 @@
 import type { PaymentMethod, Prisma, StockMovementType, UserRole } from '@prisma/client';
+import type { ReportFilterInput } from '@/lib/validations/report';
 
 export type SessionUser = {
     id: string;
@@ -10,6 +11,165 @@ export type SessionUser = {
 export type SessionPayload = SessionUser & {
     exp?: number;
     iat?: number;
+};
+
+export type DashboardLowStockItem = Prisma.ProductGetPayload<{
+    select: {
+        id: true;
+        name: true;
+        barcode: true;
+        stockQuantity: true;
+        lowStockLimit: true;
+    };
+}>;
+
+export type DashboardRecentTransaction = Prisma.SaleGetPayload<{
+    include: {
+        cashier: true;
+    };
+}>;
+
+export type DashboardRecentReturn = Prisma.ReturnGetPayload<{
+    include: {
+        sale: true;
+    };
+}>;
+
+export type DashboardChartPoint = {
+    label: string;
+    sales: number;
+    returns: number;
+};
+
+export type DashboardData = {
+    todaySales: number;
+    todaySalesCount: number;
+    productsCount: number;
+    lowStockItems: DashboardLowStockItem[];
+    recentTransactions: DashboardRecentTransaction[];
+    recentReturns: DashboardRecentReturn[];
+    todayExpenses: number;
+    chartData: DashboardChartPoint[];
+};
+
+export type ReportSale = Prisma.SaleGetPayload<{
+    select: {
+        id: true;
+        invoiceNumber: true;
+        paymentMethod: true;
+        total: true;
+        createdAt: true;
+        cashier: {
+            select: {
+                id: true;
+                fullName: true;
+            };
+        };
+    };
+}>;
+
+export type ReportSaleItem = Prisma.SaleItemGetPayload<{
+    select: {
+        id: true;
+        productNameSnapshot: true;
+        productBarcodeSnapshot: true;
+        buyingPriceSnapshot: true;
+        lineTotal: true;
+        quantity: true;
+        sale: {
+            select: {
+                invoiceNumber: true;
+                cashier: {
+                    select: {
+                        fullName: true;
+                    };
+                };
+            };
+        };
+    };
+}>;
+
+export type ReportExpense = Prisma.ExpenseGetPayload<{
+    select: {
+        id: true;
+        title: true;
+        amount: true;
+        expenseDate: true;
+        category: {
+            select: {
+                name: true;
+            };
+        };
+    };
+}>;
+
+export type ReportReturn = Prisma.ReturnGetPayload<{
+    select: {
+        id: true;
+        returnNumber: true;
+        refundAmount: true;
+        createdAt: true;
+        cashier: {
+            select: {
+                fullName: true;
+            };
+        };
+        sale: {
+            select: {
+                invoiceNumber: true;
+            };
+        };
+    };
+}>;
+
+export type ReportStockItem = Prisma.ProductGetPayload<{
+    select: {
+        id: true;
+        name: true;
+        barcode: true;
+        stockQuantity: true;
+        lowStockLimit: true;
+        sellingPrice: true;
+        category: {
+            select: {
+                name: true;
+            };
+        };
+    };
+}>;
+
+export type ReportBestSellingProduct = {
+    productName: string;
+    barcode: string;
+    quantity: number;
+    salesTotal: number;
+};
+
+export type ReportCashierSummary = {
+    cashierId: string;
+    cashierName: string;
+    totalSales: number;
+    saleCount: number;
+};
+
+export type ReportData = {
+    filters: ReportFilterInput;
+
+    summary: {
+        salesTotal: number;
+        expenseTotal: number;
+        returnTotal: number;
+        profitTotal: number;
+        netSales: number;
+    };
+
+    sales: ReportSale[];
+    saleItems: ReportSaleItem[];
+    expenses: ReportExpense[];
+    returns: ReportReturn[];
+    bestSellingProducts: ReportBestSellingProduct[];
+    stock: ReportStockItem[];
+    cashierSummary: ReportCashierSummary[];
 };
 
 export type PosProductSummary = {
