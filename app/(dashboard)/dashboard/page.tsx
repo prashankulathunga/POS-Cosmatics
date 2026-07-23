@@ -16,13 +16,18 @@ import { getDashboardData } from '@/lib/services/dashboard';
 import { getSettings } from '@/lib/services/settings';
 import { formatCurrency, formatDateTime } from '@/lib/utils';
 
+type LowStockProduct = {
+    id: string;
+    name: string;
+    barcode: string;
+    stockQuantity: number;
+};
 export default async function DashboardPage() {
     const session = await requireSession();
     const [data, settings] = await Promise.all([
         getDashboardData(session.role, session.id),
         getSettings(),
     ]);
-
 
     return (
         <div className="space-y-2">
@@ -57,7 +62,7 @@ export default async function DashboardPage() {
             <div className="grid gap-2 xl:grid-cols-[minmax(0,1.6fr)_minmax(340px,1fr)]">
                 <SalesChart data={data.chartData} currencyCode={settings.currencyCode} />
 
-                <Card className='px-2'>
+                <Card className="px-2">
                     <CardHeader>
                         <CardTitle>Low Stock Alerts</CardTitle>
                     </CardHeader>
@@ -67,13 +72,15 @@ export default async function DashboardPage() {
                                 All active products are above their alert thresholds.
                             </p>
                         ) : (
-                            data.lowStockItems.map((product) => (
+                            data.lowStockItems.map((product: LowStockProduct) => (
                                 <div
                                     key={product.id}
                                     className="flex items-center justify-between rounded-2xl border border-amber-200 bg-amber-50 p-4"
                                 >
-                                    <div className='space-y-1'>
-                                        <p className="text-sm text-slate-400">BN : {product.barcode}</p>
+                                    <div className="space-y-1">
+                                        <p className="text-sm text-slate-400">
+                                            BN : {product.barcode}
+                                        </p>
                                         <p className="font-medium text-slate-700">{product.name}</p>
                                     </div>
                                     <Badge variant="warning">{product.stockQuantity} left</Badge>
@@ -85,7 +92,7 @@ export default async function DashboardPage() {
             </div>
 
             <div className="grid gap-2 xl:grid-cols-2">
-                <Card className='bg-[linear-gradient(245deg,#ffffff,#fbd8da10)]'>
+                <Card className="bg-[linear-gradient(245deg,#ffffff,#fbd8da10)]">
                     <CardHeader>
                         <CardTitle>Recent Transactions</CardTitle>
                     </CardHeader>
@@ -120,7 +127,7 @@ export default async function DashboardPage() {
                     </CardContent>
                 </Card>
 
-                <Card className='bg-[linear-gradient(135deg,#ffffff,#fbd8da10)]'>
+                <Card className="bg-[linear-gradient(135deg,#ffffff,#fbd8da10)]">
                     <CardHeader>
                         <CardTitle>Recent Returns</CardTitle>
                     </CardHeader>
