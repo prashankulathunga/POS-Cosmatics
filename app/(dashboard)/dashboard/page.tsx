@@ -22,6 +22,29 @@ type LowStockProduct = {
     barcode: string;
     stockQuantity: number;
 };
+
+type DecimalValue = string | number | { toString(): string };
+
+type RecentTransaction = {
+    id: string;
+    invoiceNumber: string;
+    createdAt: Date | string;
+    total: DecimalValue;
+    cashier: {
+        fullName: string;
+    };
+};
+
+type RecentReturn = {
+    id: string;
+    returnNumber: string;
+    createdAt: Date | string;
+    refundAmount: DecimalValue;
+    sale: {
+        invoiceNumber: string;
+    };
+};
+
 export default async function DashboardPage() {
     const session = await requireSession();
     const [data, settings] = await Promise.all([
@@ -107,7 +130,7 @@ export default async function DashboardPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {data.recentTransactions.map((sale) => (
+                                {data.recentTransactions.map((sale:RecentTransaction) => (
                                     <TableRow key={sale.id}>
                                         <TableCell className="font-medium">
                                             {sale.invoiceNumber}
@@ -142,7 +165,7 @@ export default async function DashboardPage() {
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
-                                {data.recentReturns.map((entry) => (
+                                {data.recentReturns.map((entry: RecentReturn) => (
                                     <TableRow key={entry.id}>
                                         <TableCell className="font-medium">
                                             {entry.returnNumber}
